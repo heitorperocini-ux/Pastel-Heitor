@@ -1,12 +1,15 @@
 <!doctype html>
 <html lang="pt-br">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Contagem Pasteis</title>
-    <link rel="manifest" href="./manifest.json">
-    <link rel="icon" href="./contagem-pasteis-icon-192.png" type="image/png">
-    <meta name="theme-color" content="#f06a2d">
+
+    <!-- PWA -->
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" href="./contagem-pasteis-icon-192.png" type="image/png" />
+    <meta name="theme-color" content="#f06a2d" />
+
     <style>
       body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;margin:0;background:#f3f4f6}
       .border{border:1px solid #d1d5db}
@@ -47,16 +50,25 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- React + Babel -->
+
+    <!-- React 18 (UMD) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+    <!-- Babel Standalone para compilar JSX no navegador -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Registra o Service Worker (v2 para quebrar cache antigo) -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function(){ navigator.serviceWorker.register('./service-worker.js'); });
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('./service-worker.js?v=2');
+        });
       }
     </script>
-    <script type="text/babel">
+
+    <!-- App React em JSX — COM PRESETS -->
+    <script type="text/babel" data-presets="react,env">
       const DINHEIRO = [50,20,10,5,2,1];
       const DEFAULT_ITEMS = [
         { name: "Carne", grupo: "Pastéis" },
@@ -76,6 +88,7 @@
       ];
       const STORAGE_KEY = "pastelaria-contagem-v4";
       const zeroRow = () => ({ inicial: 0, chegou: 0, final: 0 });
+
       function useLocalState(key, initial) {
         const [state, setState] = React.useState(() => {
           try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : initial; } catch { return initial; }
@@ -83,63 +96,114 @@
         React.useEffect(() => { try { localStorage.setItem(key, JSON.stringify(state)); } catch {} }, [key, state]);
         return [state, setState];
       }
-      function formatDateISO(d = new Date()) { const pad = (n) => String(n).padStart(2,'0'); return \`\${d.getFullYear()}-\${pad(d.getMonth()+1)}-\${pad(d.getDate())}\`; }
+      function formatDateISO(d = new Date()) { const pad = (n) => String(n).padStart(2,"0"); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
       function App() {
-        const [date, setDate] = useLocalState(\`\${STORAGE_KEY}-date\`, formatDateISO());
-        const [items, setItems] = useLocalState(\`\${STORAGE_KEY}-items\`, DEFAULT_ITEMS);
-        const [rows, setRows] = useLocalState(\`\${STORAGE_KEY}-rows\`, Object.fromEntries(DEFAULT_ITEMS.map(i=>[i.name, zeroRow()])));
-        const [notas, setNotas] = useLocalState(\`\${STORAGE_KEY}-notas\`, Object.fromEntries(DINHEIRO.map(v=>[v,0])));
-        React.useEffect(()=>{
-          setRows(prev=>{ const next={...prev}; items.forEach(i=>{ if(!next[i.name]) next[i.name]=zeroRow(); }); Object.keys(next).forEach(k=>{ if(!items.find(i=>i.name===k)) delete next[k]; }); return next; });
-        },[items]);
-        const vendidos = React.useMemo(()=>Object.fromEntries(items.map(({name})=>{
-          const r=rows[name]||zeroRow();
-          const v=Math.max(0,(+r.inicial||0)+(+r.chegou||0)-(+r.final||0));
-          return [name,v];
-        })),[items,rows]);
-        const totalVendidos = React.useMemo(()=>Object.values(vendidos).reduce((a,b)=>a+(+b||0),0),[vendidos]);
-        const totalDinheiro = React.useMemo(()=>DINHEIRO.reduce((acc,v)=>acc+v*(notas[v]||0),0),[notas]);
-        function setCell(item, field, delta){ setRows(r=>{ const row={...(r[item]||zeroRow())}; row[field]=Math.max(0,(+row[field]||0)+delta); return {...r,[item]:row}; }); }
-        function editCell(item, field, value){ setRows(r=>({ ...r, [item]: { ...(r[item]||zeroRow()), [field]: Math.max(0, +value||0) } })); }
-        function setNota(valor,qtd){ setNotas(n=>({ ...n, [valor]: Math.max(0, +qtd||0) })); }
-        function exportCSV(){
+        const [date, setDate] = useLocalState(`${STORAGE_KEY}-date`, formatDateISO());
+        const [items, setItems] = useLocalState(`${STORAGE_KEY}-items`, DEFAULT_ITEMS);
+        const [rows, setRows] = useLocalState(`${STORAGE_KEY}-rows`, Object.fromEntries(DEFAULT_ITEMS.map(i => [i.name, zeroRow()])));
+        const [notas, setNotas] = useLocalState(`${STORAGE_KEY}-notas`, Object.fromEntries(DINHEIRO.map(v => [v, 0])));
+
+        React.useEffect(() => {
+          setRows(prev => {
+            const next = { ...prev };
+            items.forEach(i => { if (!next[i.name]) next[i.name] = zeroRow(); });
+            Object.keys(next).forEach(k => { if (!items.find(i => i.name === k)) delete next[k]; });
+            return next;
+          });
+        }, [items]);
+
+        const vendidos = React.useMemo(() => Object.fromEntries(
+          items.map(({ name }) => {
+            const r = rows[name] || zeroRow();
+            const v = Math.max(0, (+r.inicial||0) + (+r.chegou||0) - (+r.final||0));
+            return [name, v];
+          })
+        ), [items, rows]);
+
+        const totalVendidos = React.useMemo(() => Object.values(vendidos).reduce((a,b)=>a+(+b||0),0), [vendidos]);
+        const totalDinheiro  = React.useMemo(() => DINHEIRO.reduce((acc,v)=>acc + v*(notas[v]||0),0), [notas]);
+
+        function setCell(item, field, delta) {
+          setRows(r => {
+            const row = { ...(r[item] || zeroRow()) };
+            row[field] = Math.max(0, (+row[field]||0) + delta);
+            return { ...r, [item]: row };
+          });
+        }
+        function editCell(item, field, value) {
+          setRows(r => ({ ...r, [item]: { ...(r[item] || zeroRow()), [field]: Math.max(0, +value||0) } }));
+        }
+        function setNota(valor, qtd) { setNotas(n => ({ ...n, [valor]: Math.max(0, +qtd||0) })); }
+
+        function exportCSV() {
           const headers = ["Data","Grupo","Item","Inicial","Chegou","Final","Vendido"];
-          const rowsCsv = items.map(({name,grupo})=>{ const r=rows[name]||zeroRow(); return [date,grupo,name,r.inicial,r.chegou,r.final,vendidos[name]||0].join(","); });
-          const dinheiroCsv = DINHEIRO.map(v=>["Nota",v,"Qtd",notas[v],"Total",v*(notas[v]||0)].join(","));
+          const rowsCsv = items.map(({ name, grupo }) => {
+            const r = rows[name] || zeroRow();
+            return [date, grupo, name, r.inicial, r.chegou, r.final, vendidos[name]||0].join(",");
+          });
+          const dinheiroCsv = DINHEIRO.map(v => ["Nota", v, "Qtd", notas[v], "Total", v*(notas[v]||0)].join(","));
           const footer = ["Total vendido", totalVendidos].join(",");
-          const csv = [headers.join(","), ...rowsCsv, "", "DINHEIRO:", ...dinheiroCsv, "", footer, \`Total Dinheiro,R$\${totalDinheiro}\`].join("\n");
+          const csv = [headers.join(","), ...rowsCsv, "", "DINHEIRO:", ...dinheiroCsv, "", footer, `Total Dinheiro,R$${totalDinheiro}`].join("\n");
           const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
           const url = URL.createObjectURL(blob);
-          const a = document.createElement("a"); a.href = url; a.download = \`contagem-completa-\${date}.csv\`;
+          const a = document.createElement("a"); a.href = url; a.download = `contagem-completa-${date}.csv`;
           document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
         }
-        function resetDay(){ if(!confirm("Zerar todas as contagens do dia?")) return; setRows(Object.fromEntries(items.map(i=>[i.name,zeroRow()]))); setNotas(Object.fromEntries(DINHEIRO.map(v=>[v,0]))); }
-        const grupos = React.useMemo(()=>{ const g={}; items.forEach(i=>{ (g[i.grupo]=g[i.grupo]||[]).push(i); }); return g; },[items]);
+
+        function resetDay() {
+          if (!confirm("Zerar todas as contagens do dia?")) return;
+          setRows(Object.fromEntries(items.map(i => [i.name, zeroRow()])));
+          setNotas(Object.fromEntries(DINHEIRO.map(v => [v, 0])));
+        }
+
+        const grupos = React.useMemo(() => {
+          const g = {}; items.forEach(i => { (g[i.grupo] = g[i.grupo] || []).push(i); }); return g;
+        }, [items]);
+
         return (
           <div className="min-h-screen bg-gray-100 p-4">
             <div className="max-w-5xl mx-auto space-y-4">
               <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                 <h1 className="text-2xl font-bold">Contagem Pasteis</h1>
-                <div className="flex items-center gap-2"><label className="text-sm">Data</label><input type="date" value={date} onChange={(e)=>setDate(e.target.value)} className="border rounded px-2 py-1" /></div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm">Data</label>
+                  <input type="date" value={date} onChange={(e)=>setDate(e.target.value)} className="border rounded px-2 py-1" />
+                </div>
               </header>
-              {Object.keys(grupos).map(g=> (
+
+              {Object.keys(grupos).map((g) => (
                 <section key={g} className="bg-white rounded-2xl shadow p-3">
-                  <div className="flex justify-between items-center mb-2"><h2 className="font-semibold">{g}</h2><div className="text-sm text-gray-500">Vendido no grupo: {grupos[g].reduce((acc,it)=>acc+(vendidos[it.name]||0),0)}</div></div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h2 className="font-semibold">{g}</h2>
+                    <div className="text-sm text-gray-500">
+                      Vendido no grupo: {grupos[g].reduce((acc,it)=>acc+(vendidos[it.name]||0),0)}
+                    </div>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead><tr className="border-b"><th className="text-left py-2">Item</th>{["inicial","chegou","final"].map(field=> <th key={field} className="py-2 text-center capitalize">{field}</th>)}<th className="py-2 text-center">Vendido</th></tr></thead>
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2">Item</th>
+                          {["inicial","chegou","final"].map((field) => (
+                            <th key={field} className="py-2 text-center capitalize">{field}</th>
+                          ))}
+                          <th className="py-2 text-center">Vendido</th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        {grupos[g].map(({name})=>{
+                        {grupos[g].map(({ name }) => {
                           const r = rows[name] || zeroRow();
                           return (
                             <tr key={name} className="border-b last:border-none">
                               <td className="py-2 font-medium">{name}</td>
-                              {["inicial","chegou","final"].map(field=> (
+                              {["inicial","chegou","final"].map((field) => (
                                 <td key={field} className="py-2">
                                   <div className="flex items-center justify-center gap-1">
                                     <button onClick={()=>setCell(name,field,-5)} className="px-2 py-1 border rounded">-5</button>
                                     <button onClick={()=>setCell(name,field,-1)} className="px-2 py-1 border rounded">-1</button>
-                                    <input type="number" className="w-16 text-center border rounded px-1 py-1" value={r[field]||0} onChange={(e)=>editCell(name,field,e.target.value)} />
+                                    <input type="number" className="w-16 text-center border rounded px-1 py-1"
+                                      value={r[field]||0} onChange={(e)=>editCell(name,field,e.target.value)} />
                                     <button onClick={()=>setCell(name,field,1)} className="px-2 py-1 border rounded">+1</button>
                                     <button onClick={()=>setCell(name,field,5)} className="px-2 py-1 border rounded">+5</button>
                                   </div>
@@ -154,32 +218,65 @@
                   </div>
                 </section>
               ))}
+
               <section className="bg-white rounded-2xl shadow p-3">
                 <h2 className="font-semibold mb-2">Dinheiro em Caixa</h2>
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b"><th className="text-left py-2">Nota</th><th className="text-center py-2">Quantidade</th><th className="text-center py-2">Total</th></tr></thead>
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2">Nota</th>
+                      <th className="text-center py-2">Quantidade</th>
+                      <th className="text-center py-2">Total</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    {DINHEIRO.map(v=> (
+                    {DINHEIRO.map(v => (
                       <tr key={v} className="border-b last:border-none">
                         <td className="py-2 font-medium">R$ {v}</td>
-                        <td className="py-2 text-center"><input type="number" value={notas[v]||0} onChange={(e)=>setNota(v,e.target.value)} className="w-20 text-center border rounded px-1 py-1" /></td>
+                        <td className="py-2 text-center">
+                          <input type="number" value={notas[v]||0}
+                            onChange={(e)=>setNota(v,e.target.value)} className="w-20 text-center border rounded px-1 py-1" />
+                        </td>
                         <td className="py-2 text-center font-semibold">R$ {(v*(notas[v]||0)).toFixed(2)}</td>
                       </tr>
                     ))}
-                    <tr className="font-bold"><td colSpan="2" className="py-2 text-right pr-2">Total:</td><td className="text-center">R$ {totalDinheiro.toFixed(2)}</td></tr>
+                    <tr className="font-bold">
+                      <td colSpan="2" className="py-2 text-right pr-2">Total:</td>
+                      <td className="text-center">
+                        R$ {React.useMemo(()=>DINHEIRO.reduce((acc,v)=>acc+v*(notas[v]||0),0),[notas]).toFixed(2)}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </section>
+
               <div className="flex gap-2 flex-wrap">
-                <button onClick={resetDay} className="px-3 py-2 rounded-xl border bg-white shadow">Zerar dia</button>
-                <button onClick={exportCSV} className="px-3 py-2 rounded-xl border bg-white shadow">Exportar CSV</button>
-                <div className="ml-auto font-bold text-lg">Total vendido: {totalVendidos}</div>
+                <button onClick={()=>{ if(confirm('Zerar todas as contagens do dia?')){ 
+                  setRows(Object.fromEntries(items.map(i=>[i.name, zeroRow()])));
+                  setNotas(Object.fromEntries(DINHEIRO.map(v=>[v,0])));
+                }}} className="px-3 py-2 rounded-2xl border bg-white shadow">Zerar dia</button>
+                <button onClick={()=>{
+                  const headers=["Data","Grupo","Item","Inicial","Chegou","Final","Vendido"];
+                  const rowsCsv=items.map(({name,grupo})=>{
+                    const r=rows[name]||zeroRow();
+                    return [date,grupo,name,r.inicial,r.chegou,r.final,(+r.inicial||0)+(+r.chegou||0)-(+r.final||0)].join(",");
+                  });
+                  const dinheiroCsv = DINHEIRO.map(v=>["Nota",v,"Qtd",notas[v],"Total",v*(notas[v]||0)].join(","));
+                  const totalV = Object.values(rows).reduce((acc, r)=>acc + Math.max(0,(+r.inicial||0)+(+r.chegou||0)-(+r.final||0)), 0);
+                  const totalD = DINHEIRO.reduce((acc,v)=>acc+v*(notas[v]||0),0);
+                  const csv=[headers.join(","),...rowsCsv,"","DINHEIRO:",...dinheiroCsv,"",["Total vendido", totalV].join(","),`Total Dinheiro,R$${totalD}`].join("\n");
+                  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}); const url=URL.createObjectURL(blob);
+                  const a=document.createElement("a"); a.href=url; a.download=`contagem-completa-${date}.csv`;
+                  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                }} className="px-3 py-2 rounded-2xl border bg-white shadow">Exportar CSV</button>
               </div>
             </div>
           </div>
         );
       }
-      const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
     </script>
   </body>
 </html>
