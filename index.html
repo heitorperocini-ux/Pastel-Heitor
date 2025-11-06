@@ -96,7 +96,10 @@
         React.useEffect(() => { try { localStorage.setItem(key, JSON.stringify(state)); } catch {} }, [key, state]);
         return [state, setState];
       }
-      function formatDateISO(d = new Date()) { const pad = (n) => String(n).padStart(2,"0"); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+      function formatDateISO(d = new Date()) {
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
 
       function App() {
         const [date, setDate] = useLocalState(`${STORAGE_KEY}-date`, formatDateISO());
